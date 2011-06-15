@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+ <key>c3bcfd2532dc</key>
+ <token>a35e61fde339</token>
+ <member>
+  <login>luxor</login>
+  <avatar>http://www.betaseries.com/data/avatars/b9b96f11f29d7eae7e2d2a9beb08ec8f.jpg</avatar>
+  <stats>
+   <shows>27</shows>
+   <seasons>107</seasons>
+   <episodes>1929</episodes>
+   <progress>97,24 %</progress>
+   <episodes_to_watch>60</episodes_to_watch>
+   <time_on_tv>91320</time_on_tv>
+   <time_to_spend>1920</time_to_spend>
+  </stats>
+  <shows>
+   <show>
+    <url>boardwalkempire</url>
+    <title>Boardwalk Empire</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>community</url>
+    <title>Community</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>hawaiifiveo2010</url>
+    <title>Hawaii Five-O (2010)</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>bigbangtheory</url>
+    <title>The Big Bang Theory</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>theevent</url>
+    <title>The Event</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>thewalkingdead</url>
+    <title>The Walking Dead</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>trueblood</url>
+    <title>True Blood</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>house</url>
+    <title>House</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>breakingbad</url>
+    <title>Breaking Bad</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>desperatehousewives</url>
+    <title>Desperate Housewives</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>dexter</url>
+    <title>Dexter</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>futurama</url>
+    <title>Futurama</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>himym</url>
+    <title>How I Met Your Mother</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>fringe</url>
+    <title>Fringe</title>
+    <archive>0</archive>
+   </show>
+   <show>
+    <url>24</url>
+    <title>24</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>rubicon</url>
+    <title>Rubicon</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>alf</url>
+    <title>Alf</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>battlestargalactica</url>
+    <title>Battlestar Galactica</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>flashforward2009</url>
+    <title>Flash Forward (2009)</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>herocorp</url>
+    <title>Hero Corp</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>heroes</url>
+    <title>Heroes</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>lost</url>
+    <title>Lost</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>v2009</url>
+    <title>V (2009)</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>niptuck</url>
+    <title>Nip/Tuck</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>prisonbreak</url>
+    <title>Prison Break</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>scrubs</url>
+    <title>Scrubs</title>
+    <archive>1</archive>
+   </show>
+   <show>
+    <url>simpsons</url>
+    <title>The Simpsons</title>
+    <archive>1</archive>
+   </show>
+  </shows>
+ </member>
+ <code>1</code>
+ <errors/>
+</root>
