@@ -25,7 +25,7 @@ public class PopularityScrapper {
 		
 		Statement statement = (Statement) connection.createStatement();
 		ResultSet rs = statement.executeQuery("SELECT iata FROM airports WHERE country_iso = 'US' AND test = 0 AND iata IS NOT NULL");
-		
+
 		while(rs.next()){
 			String iataCode = rs.getString("iata");
 			long pop = getPopFromIATA(iataCode);
