@@ -1,158 +1,185 @@
 package solr;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import java.io.PrintWriter;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpException;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.params.ConnManagerParams;
-import org.apache.http.conn.params.ConnPerRouteBean;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.conn.scheme.PlainSocketFactory;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
-
-import com.Ostermiller.util.Parallelizer;
+import org.eb2.utils.cli.CLIParser;
+import org.eb2.utils.db.DBConnection;
 
 public class IndexBuilder {
 
-	//private static String[] solrHosts = {"ts2"};
-	private static String[] solrAMSHosts = {"solr-02","solr-06","solr-08","solr-10"};
-	//private static String[] solrAMSHosts = {"solr-02","solr-04","solr-06","solr-08","solr-10"};
-	private static String[] solrLHRHosts = {"solr-01","solr-03","solr-05","solr-07","solr-09"};
-	private static String port = "8080";
-	//private static String port = "8080";
+	private static final String SQL_HOST = "report-serverdb2.db.traveljigsaw.com";
+	private static final String SQL_DB = "serverdb2";
+	private static final String SQL_USER = "solrindexbuild";
+	private static final String SQL_PWD = "baishookoh";
 	
-	private static String[] indexes = {"airport","en"};
-	private static int TIME_FREQ = 10; // Seconds
+	private static final int THREAD_LIMIT = 20;
 	
-	private static ClientConnectionManager connectionManager;
+	private static ThreadSafeClientConnManager connectionManager;
 	private static DefaultHttpClient httpClient;
 	
-	/**
-	 * Import Data from Databases to Indexes
-	 */
+	private String datacenter  = "all";
+	private String[] hosts  = new String[0];
+	private String[] exclusions  = new String[0];
+	private String port  = "8080";
+	private String[] indexes  = new String[0];
+	private boolean help  = false;
+	
 	public static void main(String[] args) throws Exception {
-		HttpParams params = new BasicHttpParams();
-        params.setIntParameter(ConnManagerParams.MAX_TOTAL_CONNECTIONS, 255);
-        params.setLongParameter(ConnManagerParams.TIMEOUT, 60000);
-        params.setParameter(ConnManagerParams.MAX_CONNECTIONS_PER_ROUTE, new ConnPerRouteBean(40));
-        SchemeRegistry schemeRegistry = new SchemeRegistry();
-        schemeRegistry.register(
-                new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
-        connectionManager = new ThreadSafeClientConnManager(params, schemeRegistry);
-        httpClient = new DefaultHttpClient(connectionManager, params);
-        Parallelizer solrServerJobs = new Parallelizer();
-        for (final String host : solrLHRHosts){
-        	solrServerJobs.run(
-                new Runnable(){
-                	public void run() {
-                		fullImportHostsIndexes(host);
-					}
-                }
-            );
+        
+		CLIParser parser = new CLIParser();
+		
+		parser.addOption("h", "help", "print usage");
+		parser.addValueOption("d", "datacenter", "the datacenter (lhr, ams, all) default=all", "datacenter", false);
+		parser.addMultipleValueOption("t", "hosts", "list of specific hosts name", "hosts", false);
+		parser.addMultipleValueOption("e", "exclusions", "list of excluded hosts name", "exclusions", false);
+		parser.addValueOption("p", "port", "a specific port default=8080", "port", false);
+		parser.addMultipleValueOption("i", "indexes", "list of specific indexes default=airport,en", "indexes", false);
+		
+        IndexBuilder ib = new IndexBuilder();
+        parser.setFor(ib, args);
+        List<Future<Boolean>> jobs = new ArrayList<Future<Boolean>>();
+        List<String> chosenHosts = new ArrayList<String>();
+        
+        if(ib.isHelp()){
+        	parser.printUsage(new PrintWriter(System.out), "Index builder");
+        	return;
         }
-        solrServerJobs.join();
+        
+        if(ib.getHosts().length > 0)
+        	Collections.addAll(chosenHosts, ib.getHosts());
+        else if(ib.getDatacenter().equalsIgnoreCase("all") || StringUtils.isEmpty(ib.getDatacenter())){
+	        chosenHosts.addAll(getAllSolrServersFromDB(null));
+        }
+        else if(ib.getDatacenter().equalsIgnoreCase("lhr"))
+        	chosenHosts.addAll(getAllSolrServersFromDB("lhr"));
+        else if(ib.getDatacenter().equalsIgnoreCase("ams"))
+        	chosenHosts.addAll(getAllSolrServersFromDB("ams"));
+        else{
+        	parser.printUsage(new PrintWriter(System.out), "Index builder");
+        	return;
+        }
+        
+        if(ib.getExclusions().length > 0){
+        	for(String excludedHost : ib.getExclusions()){
+	        	Iterator<String> i = chosenHosts.iterator();
+        		while(i.hasNext()){
+        			String host = i.next();
+	        		if(host.contains(excludedHost))i.remove();
+	        	}
+        	}
+        }
+        
+        SchemeRegistry schemeRegistry = new SchemeRegistry();
+        schemeRegistry.register(new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
+        connectionManager = new ThreadSafeClientConnManager(schemeRegistry);
+        connectionManager.setMaxTotal(255);
+        connectionManager.setDefaultMaxPerRoute(40);
+        HttpParams httpParams = new BasicHttpParams();
+        HttpConnectionParams.setConnectionTimeout(httpParams, 6000);
+        httpClient = new DefaultHttpClient(connectionManager, httpParams);
+        ExecutorService executorService = Executors.newFixedThreadPool(THREAD_LIMIT);
+        
+        for (final String host : chosenHosts){
+        	HostThread hth = null;
+        	if(ib.getIndexes().length == 0)
+        		hth = new HostThread(httpClient, host, ib.getPort());
+        	else
+        		hth = new HostThread(httpClient, host, ib.getPort(), ib.getIndexes());
+        	Future<Boolean> submited = executorService.submit(hth);
+			jobs.add(submited);
+        }
+        for (Future<Boolean> future : jobs) {
+			try {
+				future.get();
+			} catch (Exception e) {}
+		}
+        executorService.shutdownNow();
 	}
 
-	public static void fullImportHostsIndexes(final String host) {
-		try {
-			System.out.println("Start Index Builder on "+host);
-			Parallelizer indexJobs = new Parallelizer();
-			for(final String index : indexes){
-	        	indexJobs.run(
-	                new Runnable(){
-	                	public void run() {
-	                		try {
-								fullImportIndex(host, index);
-							} catch (Exception e) {
-								System.err.println("Indexing "+index+" on "+host+" failed.");
-								e.printStackTrace();
-							}
-						}
-	                }
-	            );
-	        }
-	        indexJobs.join();
-			System.out.println("Building indexes on "+host+" done!");
+	public String getDatacenter() {
+		return datacenter;
+	}
+
+	public void setDatacenter(String datacenter) {
+		this.datacenter = datacenter;
+	}
+
+	public String[] getHosts() {
+		return hosts;
+	}
+
+	public void setHosts(String[] hosts) {
+		this.hosts = hosts;
+	}
+
+	public String getPort() {
+		return port;
+	}
+
+	public void setPort(String port) {
+		this.port = port;
+	}
+
+	public String[] getIndexes() {
+		return indexes;
+	}
+
+	public void setIndexes(String[] indexes) {
+		this.indexes = indexes;
+	}
+
+	public boolean isHelp() {
+		return help;
+	}
+
+	public void setHelp(boolean help) {
+		this.help = help;
+	}
+
+	public String[] getExclusions() {
+		return exclusions;
+	}
+
+	public void setExclusions(String[] exclusions) {
+		this.exclusions = exclusions;
+	}
+
+	private static List<String> getAllSolrServersFromDB(String datacenter){
+		List<String> solrServers = new ArrayList<String>();
+		DBConnection connection = new DBConnection();
+		try{
+			//Connect to DB
+			connection.connect("jdbc:mysql://" + SQL_HOST + ":3306/"+SQL_DB, SQL_USER, SQL_PWD, "com.mysql.jdbc.Driver");
+			ResultSet rs = connection.runQuery("SELECT DISTINCT NAME FROM servers_asset WHERE NAME LIKE 'solr%"+((StringUtils.isNotEmpty(datacenter))?datacenter+"%":"")+"';", false);
+			while (rs.next()) {
+				solrServers.add(rs.getString("NAME"));
+			}
+			rs.close();
 		}
-		catch (Exception e) {
+		catch(Exception e){
 			e.printStackTrace();
 		}
-	}
-
-	public static void fullImportIndex(String host, String index)
-			throws HttpException, IOException, InterruptedException {
-		while(isIndexBusy(host, index))Thread.sleep(TIME_FREQ*1000);
-		System.out.println("Index="+index+" on "+host);
-		executeSolrCommand(host, index,"full-import");
-		while(isIndexBusy(host, index))Thread.sleep(TIME_FREQ*1000);
-		System.out.println("Index="+index+" on "+host+" done!");
-	}
-
-	private static String timestamp() {
-		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd_hhmm");  
-	    return df.format(new Date());
-	}
-
-	public static void executeSolrCommand(String host, String index, String command) throws HttpException, IOException{
-		String url = "http://"+host+":"+port+"/solr/"+index+"/select?qt=/dataimport&command="+command;
-		HttpPost method = new HttpPost(url);
-		HttpResponse response = httpClient.execute(method);
-		HttpEntity entity = response.getEntity();
-		if (entity == null || response.getStatusLine().getStatusCode() != HttpStatus.SC_OK){
-			httpClient.getConnectionManager().closeExpiredConnections();
-			httpClient.getConnectionManager().closeIdleConnections(60, TimeUnit.SECONDS);
-			throw new HttpException("HTTP Status Code "+response.getStatusLine().getStatusCode());
+		finally {
+			if (connection != null)connection.close();
 		}
-		httpClient.getConnectionManager().closeExpiredConnections();
-		httpClient.getConnectionManager().closeIdleConnections(60, TimeUnit.SECONDS);
-	}	
-	
-	public static boolean isIndexBusy(String host, String index) throws HttpException, IOException{
-		String url = "http://"+host+":"+port+"/solr/"+index+"/select?qt=/dataimport&command=status";
-		HttpPost method = new HttpPost(url);
-		HttpResponse response = httpClient.execute(method);
-		HttpEntity entity = response.getEntity();
-		if (entity != null && response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-			StringBuilder sb = new StringBuilder();
-            InputStream in = entity.getContent();
-            BufferedReader buffReader = new BufferedReader(new InputStreamReader(in));
-            for (String line = buffReader.readLine(); line != null; line = buffReader.readLine()) {
-            	sb.append(line);
-            }
-            in.close();
-            String strResponse = sb.toString();
-            httpClient.getConnectionManager().closeExpiredConnections();
-			httpClient.getConnectionManager().closeIdleConnections(60, TimeUnit.SECONDS);
-			//Is index busy?
-			if(strResponse.contains("<str name=\"status\">idle</str>")){
-				//Did it failed?
-				if(strResponse.contains("Indexing failed. Rolled back all changes."))
-					System.err.println("Indexing "+index+" on "+host+" failed. Rolled back all changes.");
-				return false;
-			}
-			else 
-				return false;
-		}
-		else{
-			httpClient.getConnectionManager().closeExpiredConnections();
-			httpClient.getConnectionManager().closeIdleConnections(60, TimeUnit.SECONDS);
-			throw new HttpException("HTTP Status Code "+response.getStatusLine().getStatusCode());
-		}
-		
+		return solrServers;
 	}
 	
 }
