@@ -28,9 +28,14 @@ public class GeoPositionScrapper {
 					   "FROM titan1.d JOIN titan1.v_depot v USING(id) " +
 					   "WHERE d.del = 0 AND d.pay_local = 1 AND v.city LIKE '%Toronto (__)'";*/
 		
-		String query = "SELECT d.id AS id,CONCAT( SUBSTRING_INDEX(REPLACE(REPLACE(v.location,'(RC)',''),'(Rc)',''),'(',1), ',' , REPLACE(REPLACE(v.city,'(',''),')',''),',',v.country) AS address " +
+		//Canadian
+		/*String query = "SELECT d.id AS id,CONCAT( SUBSTRING_INDEX(REPLACE(REPLACE(v.location,'(RC)',''),'(Rc)',''),'(',1), ',' , REPLACE(REPLACE(v.city,'(',''),')',''),',',v.country) AS address " +
 					   "FROM titan1.d JOIN titan1.v_depot v USING(id) " +
-					   "WHERE d.del = 0 AND d.pay_local = 1 AND v.city LIKE '%(__)' AND v.country = 'Canada'";
+					   "WHERE d.del = 0 AND d.pay_local = 1 AND v.city LIKE '%(__)' AND v.country = 'Canada'";*/
+		
+		String query = "SELECT d.id AS id,CONCAT( SUBSTRING_INDEX(REPLACE(REPLACE(v.location,'(RC)',''),'(Rc)',''),'(',1), ',' , REPLACE(REPLACE(v.city,'(',''),')','')) AS address " +
+				   	   "FROM titan1.d JOIN titan1.v_depot v USING(id) " +
+				       "WHERE d.del = 0 AND d.pay_local = 1 AND v.city LIKE '%, Mexico' AND v.country = 'Mexico'";
 		
 		/*String query = "SELECT d.id AS id, CONCAT( REPLACE(REPLACE(v.location,'(RC)',''),'(Rc)','') , ',' , REPLACE(REPLACE(v.city,'(',''),')','')) AS address " +
 					   "FROM titan1.d JOIN titan1.v_depot v USING(id) " +
@@ -59,11 +64,12 @@ public class GeoPositionScrapper {
 		statement.close();
 		connection.close();
 		
-		System.out.println("Data ok");
+		System.out.println("Got "+values.size()+" locations");
 		
 		GeoAddressStandardizer st = new GeoAddressStandardizer("ABQIAAAA5B2f_QgM3SAOkFA_Inq1iRRLJfNN1CM5XLxwFDDB0m-HFueJ2hSTrxSkUvuggxsxgDXiAiKj5Zw6fA");
 		FileWriter fw = new FileWriter("C:/Documents and Settings/givres/Desktop/location_fixed-"+new Date().getTime()+".sql");
-		for (String[] supplier : values){
+		for (int i=0;i<values.size();i++){
+			String[] supplier = values.get(i);
 			try{
 				List<GeoAddress> addresses = st.standardizeToGeoAddresses(supplier[1]);
 				if(addresses!=null && !addresses.isEmpty()){
@@ -75,6 +81,8 @@ public class GeoPositionScrapper {
 			catch(Exception e){
 				fw.append("-- Failed to get location id="+supplier[0]+" address='"+supplier[1]+"'\n");
 			}
+			if(i>99 && i%100 == 0)
+				System.out.println(i+" locations processed");
 		}
 		fw.flush();
 		fw.close();
